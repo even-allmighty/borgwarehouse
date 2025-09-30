@@ -1,5 +1,6 @@
 services:
   borgwarehouse:
+    read_only: true
     container_name: borgwarehouse
     # If you want to build the image yourself, uncomment the following lines and comment the image line
     #build:
