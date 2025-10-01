@@ -128,7 +128,7 @@ check_repos_directory() {
   fi
 }
 
-get_SSH_fingerprints() {
+print_ssh_fingerprints() {
   print_green "Getting SSH fingerprints..."
   RSA_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" | awk '{print $2}')
   ED25519_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" | awk '{print $2}')
@@ -157,7 +157,7 @@ init_ssh_server
 check_ssh_directory
 create_authorized_keys_file
 check_repos_directory
-get_SSH_fingerprints
+print_ssh_fingerprints
 
 print_green "Successful initialization. BorgWarehouse is ready !"
 exec supervisord -c /app/supervisord.conf
