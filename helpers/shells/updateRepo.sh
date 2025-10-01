@@ -9,23 +9,12 @@
 # Exit when any command fails
 set -e
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
-# Priority order: Docker variables > .env home variable > default
-# Use Docker variables if available, otherwise fall back to home variable, then default
-if [[ -n "$REPOS_DIR" && -n "$AUTHORIZED_KEYS_FILE" ]]; then
-    # Docker environment - use Docker variables
-    pool="$REPOS_DIR"
-    authorized_keys="$AUTHORIZED_KEYS_FILE"
-else
-    # Non-Docker environment - use home variable with default fallback
-    : "${home:=/home/borgwarehouse}"
-    pool="${home}/repos"
-    authorized_keys="${home}/.ssh/authorized_keys"
-fi
+# Use centralized configuration
+pool="$BW_REPOS_DIR"
+authorized_keys="$BW_AUTHORIZED_KEYS"
 
 # Check args
 if [ "$1" == "" ] || [ "$2" == "" ] || [ "$3" == "" ] || [ "$4" != "true" ] && [ "$4" != "false" ]; then

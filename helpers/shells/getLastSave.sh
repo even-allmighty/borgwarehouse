@@ -20,21 +20,11 @@
 # Exit when any command fails
 set -e
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
-# Priority order: Docker variables > .env home variable > default
-# Use Docker variables if available, otherwise fall back to home variable, then default
-if [[ -n "$REPOS_DIR" ]]; then
-    # Docker environment - use Docker variables
-    repos_path="$REPOS_DIR"
-else
-    # Non-Docker environment - use home variable with default fallback
-    : "${home:=/home/borgwarehouse}"
-    repos_path="${home}/repos"
-fi
+# Use centralized configuration
+repos_path="$BW_REPOS_DIR"
 
 if [ -n "$(find -L "$repos_path" -mindepth 1 -maxdepth 1 -type d)" ]; then
   stat --format='{"repositoryName":"%n","lastSave":%Y}' \

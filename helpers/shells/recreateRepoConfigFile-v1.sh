@@ -33,21 +33,11 @@
 # |  43G |   64G |
 ################################################################################
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
-# Priority order: Docker variables > .env home variable > default
-# Use Docker variables if available, otherwise fall back to home variable, then default
-if [[ -n "$DATA_DIR" ]]; then
-    # Docker environment - use Docker variables
-    bwDataDir="$DATA_DIR"
-else
-    # Non-Docker environment - use home variable with default fallback
-    : "${home:=/home/borgwarehouse}"
-    bwDataDir="$home"
-fi
+# Use centralized configuration
+bwDataDir="$BW_DATA_DIR"
 
 directoriesList=$(ls -A $bwDataDir)
 _AUTOSIZE=0
