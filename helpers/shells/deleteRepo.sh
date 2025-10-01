@@ -14,12 +14,18 @@ if [[ -f .env ]]; then
     source .env
 fi
 
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
-
-# Some variables
-pool="${home}/repos"
-authorized_keys="${home}/.ssh/authorized_keys"
+# Priority order: Docker variables > .env home variable > default
+# Use Docker variables if available, otherwise fall back to home variable, then default
+if [[ -n "$REPOS_DIR" && -n "$AUTHORIZED_KEYS_FILE" ]]; then
+    # Docker environment - use Docker variables
+    pool="$REPOS_DIR"
+    authorized_keys="$AUTHORIZED_KEYS_FILE"
+else
+    # Non-Docker environment - use home variable with default fallback
+    : "${home:=/home/borgwarehouse}"
+    pool="${home}/repos"
+    authorized_keys="${home}/.ssh/authorized_keys"
+fi
 
 # Check arg
 if [[ $# -ne 1 || $1 = "" ]]; then

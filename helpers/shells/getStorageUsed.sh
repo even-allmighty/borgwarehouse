@@ -24,11 +24,19 @@ if [[ -f .env ]]; then
     source .env
 fi
 
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Priority order: Docker variables > .env home variable > default
+# Use Docker variables if available, otherwise fall back to home variable, then default
+if [[ -n "$REPOS_DIR" ]]; then
+    # Docker environment - use Docker variables
+    repos_path="$REPOS_DIR"
+else
+    # Non-Docker environment - use home variable with default fallback
+    : "${home:=/home/borgwarehouse}"
+    repos_path="${home}/repos"
+fi
 
 # Get the size of each repository and format as JSON
-cd "${home}"/repos
+cd "$repos_path"
 output=$(du -s -L -- * 2>/dev/null | awk '{print "{\"size\":" $1 ",\"name\":\"" $2 "\"}"}' | jq -s '.')
 if [ -z "$output" ]; then
   output="[]"

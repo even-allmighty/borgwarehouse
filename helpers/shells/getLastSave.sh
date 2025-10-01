@@ -25,12 +25,20 @@ if [[ -f .env ]]; then
     source .env
 fi
 
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Priority order: Docker variables > .env home variable > default
+# Use Docker variables if available, otherwise fall back to home variable, then default
+if [[ -n "$REPOS_DIR" ]]; then
+    # Docker environment - use Docker variables
+    repos_path="$REPOS_DIR"
+else
+    # Non-Docker environment - use home variable with default fallback
+    : "${home:=/home/borgwarehouse}"
+    repos_path="${home}/repos"
+fi
 
-if [ -n "$(find -L "${home}"/repos -mindepth 1 -maxdepth 1 -type d)" ]; then
+if [ -n "$(find -L "$repos_path" -mindepth 1 -maxdepth 1 -type d)" ]; then
   stat --format='{"repositoryName":"%n","lastSave":%Y}' \
-  "${home}"/repos/*/integrity* | 
+  "$repos_path"/*/integrity* | 
   jq --slurp '[.[] | .repositoryName = (.repositoryName | split("/")[-2])]'
 else
     echo "[]"

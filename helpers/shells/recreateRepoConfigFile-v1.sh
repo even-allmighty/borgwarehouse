@@ -33,7 +33,22 @@
 # |  43G |   64G |
 ################################################################################
 
-bwDataDir="/var/borgwarehouse"
+# Load .env if exists
+if [[ -f .env ]]; then
+    source .env
+fi
+
+# Priority order: Docker variables > .env home variable > default
+# Use Docker variables if available, otherwise fall back to home variable, then default
+if [[ -n "$DATA_DIR" ]]; then
+    # Docker environment - use Docker variables
+    bwDataDir="$DATA_DIR"
+else
+    # Non-Docker environment - use home variable with default fallback
+    : "${home:=/home/borgwarehouse}"
+    bwDataDir="$home"
+fi
+
 directoriesList=$(ls -A $bwDataDir)
 _AUTOSIZE=0
 
