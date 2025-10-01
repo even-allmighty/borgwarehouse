@@ -125,3 +125,6 @@ docker-compose.yml
 
 # Commit tests docker-compose
 !tests/bats/docker-compose.yml
+
+# Local bind mounts of the compose volumes
+data

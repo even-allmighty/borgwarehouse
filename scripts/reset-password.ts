@@ -6,7 +6,7 @@
  *   pnpm reset:password
  *
  * Docker:
- *   docker exec borgwarehouse pnpm --dir /home/borgwarehouse/app reset:password
+ *   docker exec borgwarehouse pnpm --dir /app reset:password
  *
  * Prints the new password to the terminal. Log in and change it afterwards.
  */

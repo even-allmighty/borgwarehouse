@@ -2,47 +2,45 @@
 
 set -e
 
-PUID=${PUID:-1000}
-PGID=${PGID:-1000}
-
-SSH_DIR="/home/borgwarehouse/.ssh"
-AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
-REPOS_DIR="/home/borgwarehouse/repos"
-CONFIG_DIR="/home/borgwarehouse/app/config"
+CONFIG_DIR="/app/config"
 
 print_green() { echo -e "\e[92m$1\e[0m"; }
 print_red()   { echo -e "\e[91m$1\e[0m"; }
 
-# 1. Remap borgwarehouse to PUID:PGID
+# 1. Give the current UID:GID a passwd entry
 
-remap_user() {
-  if [ "$PUID" -eq 0 ] || [ "$PGID" -eq 0 ]; then
-    print_red "[ERROR] PUID and PGID cannot be 0. Running the app as root is not allowed."
-    exit 1
-  fi
+# The container runs as whatever UID:GID the runtime hands us, so that UID has
+# no entry in /etc/passwd and /etc/passwd is not writable. ssh-keygen and sshd
+# both refuse to work without one, so libnss-wrapper serves a fake entry from
+# files we write to the tmpfs.
+create_dummy_passwd() {
+  local current_uid current_gid
+  current_uid=$(id -u)
+  current_gid=$(id -g)
 
-  print_green "Mapping borgwarehouse to UID=$PUID GID=$PGID"
-  # Edit passwd/group directly to avoid usermod scanning and chowning mounted volumes
-  sed -i "s/^borgwarehouse:x:[0-9]*:[0-9]*:/borgwarehouse:x:$PUID:$PGID:/" /etc/passwd
-  sed -i "s/^borgwarehouse:x:[0-9]*:/borgwarehouse:x:$PGID:/" /etc/group
+  print_green "Creating dummy passwd file for borgwarehouse (uid: $current_uid, gid: $current_gid)"
 
-  # App files stay root:root (set in Dockerfile) so the running app cannot
-  # modify its own code. Only chown the home dir itself; volume mounts
-  # (.ssh, repos, app/config) are handled separately by prepare_volume.
-  chown borgwarehouse:borgwarehouse /home/borgwarehouse
+  mkdir -p "$BORG_BASE_DIR"
+
+  echo "borgwarehouse:x:$current_uid:$current_gid:borgwarehouse gecos:$BORG_BASE_DIR:/bin/bash" >/tmp/passwd
+  echo "borgwarehouse:x:$current_gid:" >/tmp/group
 }
 
-# 2. Check volume is mounted, fix ownership and check it is writable
+ssh_keygen_with_nss() {
+  LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
+    ssh-keygen "$@"
+}
+
+# 2. Check volume is mounted and writable
 
 # Detect a real mount (named volume or bind mount) via /proc/mounts. #615
 is_mounted() {
   grep -q " $1 " /proc/mounts
 }
 
-prepare_volume() {
+check_volume() {
   local dir=$1
   local name=$2
-  local mode=$3
 
   if ! is_mounted "$dir"; then
     print_red "[ERROR] Volume '$name' is not mounted. Expected path: $dir"
@@ -50,56 +48,67 @@ prepare_volume() {
     exit 1
   fi
 
-  # We run as root here: align the volume ownership to PUID:PGID so that named
-  # volumes (created root:root or as the build-time user) become writable by the
-  # app, whatever PUID/PGID is used.
-  if [ "$mode" = "recursive" ]; then
-    chown -R "$PUID:$PGID" "$dir" 2>/dev/null || true
-  else
-    # Top-level only: avoids walking a potentially huge repos tree. Existing
-    # repository sub-directories were already created by the app user.
-    chown "$PUID:$PGID" "$dir" 2>/dev/null || true
-  fi
-
-  if ! gosu borgwarehouse test -w "$dir" 2>/dev/null; then
-    print_red "[ERROR] Volume '$name' ($dir) is not writable by UID=$PUID GID=$PGID."
-    print_red "        If it is a bind mount, fix on the host: chown -R $PUID:$PGID <your-host-path-for-$name>"
+  # Nothing can be chowned from here: the container is unprivileged and the
+  # root filesystem is read-only, so the host has to get the ownership right.
+  if [ ! -w "$dir" ]; then
+    print_red "[ERROR] Volume '$name' ($dir) is not writable by UID=$(id -u) GID=$(id -g)."
+    print_red "        Fix it on the host: chown -R $(id -u):$(id -g) <your-host-path-for-$name>"
     exit 1
   fi
 }
 
 # 3. Generate SSH host keys if needed
 
+# /etc/ssh belongs to the read-only image, so the host keys live in the ssh
+# volume and are wired up through a config snippet included by sshd_config.
+# Generating them by type (instead of ssh-keygen -A, which only writes to
+# /etc/ssh) keeps existing keys untouched.
 init_ssh_server() {
-  # Generate any MISSING host key type. `ssh-keygen -A` never overwrites existing
-  # keys, so custom / pre-provisioned keys are preserved; it only fills in the
-  # key types BorgWarehouse needs (rsa, ecdsa, ed25519), which get_SSH_fingerprints
-  # reads later. We check all three files (not just one, and not "/etc/ssh empty")
-  # so a volume providing only a subset of key types is completed correctly. #615
-  if [ ! -f /etc/ssh/ssh_host_ed25519_key ] \
-     || [ ! -f /etc/ssh/ssh_host_rsa_key ] \
-     || [ ! -f /etc/ssh/ssh_host_ecdsa_key ]; then
+  mkdir -p "$SSH_HOST_KEYS_DIR"
+  chmod 700 "$SSH_HOST_KEYS_DIR"
+
+  if [ ! -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" ] \
+     || [ ! -f "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" ] \
+     || [ ! -f "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" ]; then
     print_green "Generating missing SSH host keys..."
-    ssh-keygen -A
+    [ -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" ] ||
+      ssh_keygen_with_nss -t rsa -b 4096 -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" -N ""
+    [ -f "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" ] ||
+      ssh_keygen_with_nss -t ecdsa -f "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" -N ""
+    [ -f "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" ] ||
+      ssh_keygen_with_nss -t ed25519 -f "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" -N ""
   fi
-  if [ ! -f /etc/ssh/moduli ]; then
-    cp /home/borgwarehouse/moduli /etc/ssh/
-  fi
-  if [ ! -f "/etc/ssh/sshd_config" ]; then
-    print_green "sshd_config not found in your volume, copying the default one..."
-    cp /home/borgwarehouse/app/sshd_config /etc/ssh/
-  fi
+
+  chmod 600 "$SSH_HOST_KEYS_DIR"/ssh_host_*_key
+  chmod 644 "$SSH_HOST_KEYS_DIR"/ssh_host_*_key.pub
+
+  cat >/tmp/ssh_dynamic.conf <<-EOF
+	# Hostkeys
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_rsa_key
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_ed25519_key
+
+	Match User borgwarehouse
+	  AuthorizedKeysFile $AUTHORIZED_KEYS_FILE
+EOF
 }
 
-# 4. Setup authorized_keys
+# 4. Setup the ssh volume and authorized_keys
+
+setup_ssh_directory() {
+  chmod 700 "$SSH_MOUNT_DIR"
+
+  # The client keys of the repositories are kept in a sub-directory so the
+  # volume root can stay 700 whatever the host created it with.
+  mkdir -p "$SSH_CLIENT_DIR"
+  chmod 700 "$SSH_CLIENT_DIR"
+}
 
 setup_authorized_keys() {
   if [ ! -f "$AUTHORIZED_KEYS_FILE" ]; then
     print_green "Creating authorized_keys file..."
     touch "$AUTHORIZED_KEYS_FILE"
   fi
-  chown borgwarehouse:borgwarehouse "$SSH_DIR" "$AUTHORIZED_KEYS_FILE"
-  chmod 700 "$SSH_DIR"
   chmod 600 "$AUTHORIZED_KEYS_FILE"
 }
 
@@ -107,9 +116,9 @@ setup_authorized_keys() {
 
 get_SSH_fingerprints() {
   print_green "Getting SSH fingerprints..."
-  RSA_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_rsa_key | awk '{print $2}')
-  ED25519_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key | awk '{print $2}')
-  ECDSA_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key | awk '{print $2}')
+  RSA_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" | awk '{print $2}')
+  ED25519_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" | awk '{print $2}')
+  ECDSA_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" | awk '{print $2}')
   export SSH_SERVER_FINGERPRINT_RSA="$RSA_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ED25519="$ED25519_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ECDSA="$ECDSA_FINGERPRINT"
@@ -133,15 +142,15 @@ check_env() {
 
 # Run
 
-remap_user
+create_dummy_passwd
 check_env
-mkdir -p /run/sshd
+check_volume "$SSH_MOUNT_DIR" ".ssh"
+check_volume "$REPOS_DIR"     "repos"
+check_volume "$CONFIG_DIR"    "config"
 init_ssh_server
-prepare_volume "$SSH_DIR"    ".ssh"   recursive
-prepare_volume "$REPOS_DIR"  "repos"
-prepare_volume "$CONFIG_DIR" "config" recursive
+setup_ssh_directory
 setup_authorized_keys
 get_SSH_fingerprints
 
 print_green "Successful initialization. BorgWarehouse is ready !"
-exec supervisord -c /home/borgwarehouse/app/supervisord.conf 
+exec supervisord -c /app/supervisord.conf

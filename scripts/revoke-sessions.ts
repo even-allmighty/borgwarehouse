@@ -6,7 +6,7 @@
  *   pnpm revoke:sessions
  *
  * Docker:
- *   docker exec borgwarehouse pnpm --dir /home/borgwarehouse/app revoke:sessions
+ *   docker exec borgwarehouse pnpm --dir /app revoke:sessions
  */
 import Database from 'better-sqlite3';
 import path from 'path';
