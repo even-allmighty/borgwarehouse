@@ -15,7 +15,7 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 
-COPY . .
+COPY --exclude=docker . .
 
 RUN sed -i "s/images:/output: 'standalone',images:/" next.config.ts
 
@@ -36,7 +36,7 @@ RUN mkdir -p /app
 
 WORKDIR /app
 
-COPY --from=builder /app/docker/docker-bw-init.sh /app/LICENSE ./
+COPY --from=builder /app/LICENSE ./
 COPY --from=builder /app/helpers/shells ./helpers/shells
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
