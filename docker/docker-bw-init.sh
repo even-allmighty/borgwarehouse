@@ -95,13 +95,51 @@ EOF
 
 # 4. Setup the ssh volume and authorized_keys
 
+# A chmod on a mount point fails as soon as the host directory belongs to
+# someone else, and the errors that follow (sshd refusing the keys, borg unable
+# to write) say nothing about the real cause. Report the mode, try to fix it,
+# and if that is refused print the commands to run on the host.
+check_mount_mode() {
+  local dir=$1
+  local name=$2
+  local desired=$3
+  local current
+  current=$(stat -c "%a" "$dir" 2>/dev/null || echo "000")
+
+  print_green "Checking $name volume permissions: $dir (current: $current, desired: $desired)"
+
+  if [ "$current" = "$desired" ]; then
+    return
+  fi
+
+  print_red "The $name volume has incorrect permissions: $current (expected: $desired)"
+  print_green "Attempting to fix permissions..."
+
+  if chmod "$desired" "$dir" 2>/dev/null; then
+    print_green "Successfully set permissions to $desired on $dir"
+  else
+    print_red "[ERROR] Cannot set permissions on the $name volume!"
+    print_red "        Please run the following commands on the host system:"
+    print_red "          sudo chmod $desired $dir"
+    print_red "          sudo chown $(id -u):$(id -g) $dir"
+    exit 1
+  fi
+}
+
 setup_ssh_directory() {
-  chmod 700 "$SSH_MOUNT_DIR"
+  check_mount_mode "$SSH_MOUNT_DIR" "ssh" 700
 
   # The client keys of the repositories are kept in a sub-directory so the
   # volume root can stay 700 whatever the host created it with.
   mkdir -p "$SSH_CLIENT_DIR"
   chmod 700 "$SSH_CLIENT_DIR"
+}
+
+# The repositories are only ever read by borg over ssh, so 700 is the default.
+# Setups that share the pool with another service (a host backup agent, a
+# monitoring job) can relax it with REPOS_PERMISSIONS.
+setup_repos_directory() {
+  check_mount_mode "$REPOS_DIR" "repos" "${REPOS_PERMISSIONS:-700}"
 }
 
 setup_authorized_keys() {
@@ -149,6 +187,7 @@ check_volume "$REPOS_DIR"     "repos"
 check_volume "$CONFIG_DIR"    "config"
 init_ssh_server
 setup_ssh_directory
+setup_repos_directory
 setup_authorized_keys
 get_SSH_fingerprints
 
