@@ -4,11 +4,12 @@ set -e
 
 # Fixed paths for mounted volumes
 DATA_DIR="/data"
-SSH_DIR="$DATA_DIR/ssh"
-SSH_CLIENT_DIR="$SSH_DIR/client"
+SSH_CLIENT_MOUNT_DIR="$DATA_DIR/ssh"
+SSH_CLIENT_DIR="$SSH_CLIENT_MOUNT_DIR/client"
 SSH_HOST_KEYS_DIR="$DATA_DIR/ssh_host_keys"
-AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
-REPOS_DIR="$DATA_DIR/repos"
+AUTHORIZED_KEYS_FILE="$SSH_CLIENT_MOUNT_DIR/authorized_keys"
+REPOS_MOUNT_DIR="$DATA_DIR/repos"
+REPOS_DIR="$REPOS_MOUNT_DIR/repos"
 
 print_green() {
   echo -e "\e[92m$1\e[0m";
@@ -118,10 +119,11 @@ create_authorized_keys_file() {
 }
 
 check_repos_directory() {
-  if [ ! -d "$REPOS_DIR" ]; then
+  if [ ! -d "$REPOS_MOUNT_DIR" ]; then
     print_red "The repos directory does not exist, you need to mount it as docker volume."
     exit 2
-  else 
+  else
+    mkdir -p "$REPOS_DIR"
     chmod 700 "$REPOS_DIR"
   fi
 }
