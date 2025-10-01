@@ -3,9 +3,9 @@
 set -e
 
 # Fixed paths for mounted volumes
-SSH_DIR="/data/ssh"
-SSH_HOST_KEYS_DIR="/data/ssh_host_keys"
+SSH_DIR="/data/ssh/client"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
+SSH_HOST_KEYS_DIR="/data/ssh_host_keys"
 REPOS_DIR="/data/repos"
 
 print_green() {
