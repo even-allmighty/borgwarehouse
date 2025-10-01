@@ -14,6 +14,21 @@ print_red() {
   echo -e "\e[91m$1\e[0m";
 }
 
+create_dummy_passwd() {
+  # Create dummy passwd and group files for nss-wrapper
+  # This is needed because ssh-keygen requires passwd entries
+  local current_uid=$(id -u)
+  local current_gid=$(id -g)
+
+  print_green "Creating dummy passwd file for containeruser (uid: $current_uid, gid: $current_gid)"
+
+  # Create passwd file
+  echo "borgwarehouse:x:$current_uid:$current_gid:borgwarehouse gecos:/tmp/borgwarehouse:/bin/bash" >/tmp/passwd
+
+  # Create group file
+  echo "borgwarehouse:x:$current_gid:" >/tmp/group
+}
+
 init_ssh_server() {
 
   mkdir -p "$SSH_HOST_KEYS_DIR"
@@ -21,9 +36,20 @@ init_ssh_server() {
 
   if [ ! -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" ]; then
     print_green "Generating SSH host keys..."
-    ssh-keygen -t rsa -b 4096 -f /data/ssh_host_keys/ssh_host_rsa_key -N ""
-    ssh-keygen -t ecdsa -f /data/ssh_host_keys/ssh_host_ecdsa_key -N ""
-    ssh-keygen -t ed25519 -f /data/ssh_host_keys/ssh_host_ed25519_key -N ""
+
+    # Create dummy passwd file for nss-wrapper
+    create_dummy_passwd
+
+    # Generate keys with nss-wrapper to provide passwd entries
+    LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
+      ssh-keygen -t rsa -b 4096 -f /data/ssh_host_keys/ssh_host_rsa_key -N ""
+    LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
+      ssh-keygen -t ecdsa -f /data/ssh_host_keys/ssh_host_ecdsa_key -N ""
+    LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
+      ssh-keygen -t ed25519 -f /data/ssh_host_keys/ssh_host_ed25519_key -N ""
+    
+    # Clean up temporary files
+    rm -f /tmp/passwd /tmp/group
   fi
 
   # Set proper permissions for host keys
