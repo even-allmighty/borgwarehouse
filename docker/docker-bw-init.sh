@@ -12,10 +12,10 @@ REPOS_MOUNT_DIR="$DATA_DIR/repos"
 REPOS_DIR="$REPOS_MOUNT_DIR/repos"
 
 print_green() {
-  echo -e "\e[92m$1\e[0m";
+  echo -e "\e[92m$1\e[0m"
 }
-print_red() { 
-  echo -e "\e[91m$1\e[0m";
+print_red() {
+  echo -e "\e[91m$1\e[0m"
 }
 
 create_dummy_passwd() {
