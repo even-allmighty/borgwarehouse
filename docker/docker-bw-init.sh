@@ -3,10 +3,11 @@
 set -e
 
 # Fixed paths for mounted volumes
-SSH_DIR="/data/ssh/client"
+DATA_DIR="/data"
+SSH_DIR="$DATA_DIR/ssh/client"
+SSH_HOST_KEYS_DIR="$DATA_DIR/ssh_host_keys"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
-SSH_HOST_KEYS_DIR="/data/ssh_host_keys"
-REPOS_DIR="/data/repos"
+REPOS_DIR="$DATA_DIR/repos"
 
 print_green() {
   echo -e "\e[92m$1\e[0m";
