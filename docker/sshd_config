@@ -6,7 +6,6 @@ LogLevel INFO
 SyslogFacility AUTH
 
 # Security
-Protocol 2
 PermitRootLogin no
 PasswordAuthentication no
 ChallengeResponseAuthentication no
