@@ -24,13 +24,21 @@ create_dummy_passwd() {
   local current_uid=$(id -u)
   local current_gid=$(id -g)
 
-  print_green "Creating dummy passwd file for containeruser (uid: $current_uid, gid: $current_gid)"
+  print_green "Creating dummy passwd file for borgwarehouse (uid: $current_uid, gid: $current_gid)"
+
+  mkdir -p /tmp/borgwarehouse
 
   # Create passwd file
   echo "borgwarehouse:x:$current_uid:$current_gid:borgwarehouse gecos:/tmp/borgwarehouse:/bin/bash" >/tmp/passwd
 
   # Create group file
   echo "borgwarehouse:x:$current_gid:" >/tmp/group
+}
+
+# Function to run ssh-keygen with nss-wrapper
+ssh_keygen_with_nss() {
+  LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
+    ssh-keygen "$@"
 }
 
 init_ssh_server() {
@@ -41,19 +49,11 @@ init_ssh_server() {
   if [ ! -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" ]; then
     print_green "Generating SSH host keys..."
 
-    # Create dummy passwd file for nss-wrapper
-    create_dummy_passwd
+    # Generate keys using nss-wrapper function
+    ssh_keygen_with_nss -t rsa -b 4096 -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" -N ""
+    ssh_keygen_with_nss -t ecdsa -f "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" -N ""
+    ssh_keygen_with_nss -t ed25519 -f "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" -N ""
 
-    # Generate keys with nss-wrapper to provide passwd entries
-    LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
-      ssh-keygen -t rsa -b 4096 -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" -N ""
-    LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
-      ssh-keygen -t ecdsa -f "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" -N ""
-    LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
-      ssh-keygen -t ed25519 -f "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" -N ""
-
-    # Clean up temporary files
-    rm -f /tmp/passwd /tmp/group
   fi
 
   # Set proper permissions for host keys
@@ -130,9 +130,9 @@ check_repos_directory() {
 
 print_ssh_fingerprints() {
   print_green "Getting SSH fingerprints..."
-  RSA_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" | awk '{print $2}')
-  ED25519_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" | awk '{print $2}')
-  ECDSA_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" | awk '{print $2}')
+  RSA_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" | awk '{print $2}')
+  ED25519_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" | awk '{print $2}')
+  ECDSA_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" | awk '{print $2}')
   export SSH_SERVER_FINGERPRINT_RSA="$RSA_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ED25519="$ED25519_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ECDSA="$ECDSA_FINGERPRINT"
@@ -152,6 +152,7 @@ check_env() {
   fi
 }
 
+create_dummy_passwd
 check_env
 init_ssh_server
 check_ssh_directory
