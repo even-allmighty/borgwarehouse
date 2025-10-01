@@ -4,6 +4,7 @@ set -e
 
 # Fixed paths for mounted volumes
 SSH_DIR="/data/ssh"
+SSH_HOST_KEYS_DIR="/data/ssh_host_keys"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
 REPOS_DIR="/data/repos"
 
@@ -42,12 +43,12 @@ init_ssh_server() {
 
     # Generate keys with nss-wrapper to provide passwd entries
     LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
-      ssh-keygen -t rsa -b 4096 -f /data/ssh_host_keys/ssh_host_rsa_key -N ""
+      ssh-keygen -t rsa -b 4096 -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" -N ""
     LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
-      ssh-keygen -t ecdsa -f /data/ssh_host_keys/ssh_host_ecdsa_key -N ""
+      ssh-keygen -t ecdsa -f "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" -N ""
     LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
-      ssh-keygen -t ed25519 -f /data/ssh_host_keys/ssh_host_ed25519_key -N ""
-    
+      ssh-keygen -t ed25519 -f "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" -N ""
+
     # Clean up temporary files
     rm -f /tmp/passwd /tmp/group
   fi
@@ -125,9 +126,9 @@ check_repos_directory() {
 
 get_SSH_fingerprints() {
   print_green "Getting SSH fingerprints..."
-  RSA_FINGERPRINT=$(ssh-keygen -lf /data/ssh/ssh_host_rsa_key | awk '{print $2}')
-  ED25519_FINGERPRINT=$(ssh-keygen -lf data/ssh/ssh_host_ed25519_key | awk '{print $2}')
-  ECDSA_FINGERPRINT=$(ssh-keygen -lf /data/ssh/ssh_host_ecdsa_key | awk '{print $2}')
+  RSA_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" | awk '{print $2}')
+  ED25519_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" | awk '{print $2}')
+  ECDSA_FINGERPRINT=$(ssh-keygen -lf "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" | awk '{print $2}')
   export SSH_SERVER_FINGERPRINT_RSA="$RSA_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ED25519="$ED25519_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ECDSA="$ECDSA_FINGERPRINT"
