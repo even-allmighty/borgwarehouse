@@ -4,7 +4,8 @@ set -e
 
 # Fixed paths for mounted volumes
 DATA_DIR="/data"
-SSH_DIR="$DATA_DIR/ssh/client"
+SSH_DIR="$DATA_DIR/ssh"
+SSH_CLIENT_DIR="$SSH_DIR/client"
 SSH_HOST_KEYS_DIR="$DATA_DIR/ssh_host_keys"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
 REPOS_DIR="$DATA_DIR/repos"
