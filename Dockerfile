@@ -29,6 +29,10 @@ ENV NODE_ENV production
 ENV HOSTNAME=
 
 ENV DATA_DIR="/data"
+ENV SSH_MOUNT_DIR="$DATA_DIR/ssh"
+ENV SSH_CLIENT_DIR="$SSH_MOUNT_DIR/auth"
+ENV SSH_HOST_KEYS_DIR="$SSH_MOUNT_DIR/host_keys"
+ENV AUTHORIZED_KEYS_FILE="$SSH_MOUNT_DIR/authorized_keys"
 
 RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' >> /etc/apt/sources.list
 RUN apt-get update && apt-get install -y \

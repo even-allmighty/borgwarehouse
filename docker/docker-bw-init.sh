@@ -4,7 +4,6 @@ set -e
 
 SSH_DIR="$DATA_DIR/.ssh"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
-REPOS_DIR="$DATA_DIR/repos"
 
 print_green() {
   echo -e "\e[92m$1\e[0m"
@@ -66,15 +65,42 @@ init_ssh_server() {
 	  AuthorizedKeysFile $AUTHORIZED_KEYS_FILE
 EOF
 }
+
+check_ssh_mount_permissions() {
+  # Check if SSH mount directory has correct permissions (700)
+  local current_perms=$(stat -c "%a" "$SSH_MOUNT_DIR" 2>/dev/null || echo "000")
+  
+  print_green "Checking SSH mount directory permissions: $SSH_MOUNT_DIR (current: $current_perms)"
+  
+  if [ "$current_perms" != "700" ]; then
+    print_red "SSH mount directory has incorrect permissions: $current_perms (expected: 700)"
+    print_green "Attempting to fix permissions..."
+    
+    if chmod 700 "$SSH_MOUNT_DIR" 2>/dev/null; then
+      print_green "Successfully set permissions to 700 on $SSH_MOUNT_DIR"
+    else
+      print_red "ERROR: Cannot set permissions on SSH mount directory!"
+      print_red "Please run the following command on the host system:"
+      print_red "  sudo chmod 700 $SSH_MOUNT_DIR"
+      print_red "  sudo chown \$(id -u):\$(id -g) $SSH_MOUNT_DIR"
+      print_red ""
+      print_red "The SSH mount directory must have 700 permissions and be owned by the user running the container."
+      exit 1
+    fi
+  else
+    print_green "SSH mount directory permissions are correct (700)"
   fi
 }
 
 check_ssh_directory() {
-  if [ ! -d "$SSH_DIR" ]; then
-    print_red "The .ssh directory does not exist, you need to mount it as docker volume."
+  if [ ! -d "$SSH_MOUNT_DIR" ]; then
+    print_red "The $SSH_MOUNT_DIR directory does not exist, you need to mount it as docker volume."
     exit 1
-  else 
-    chmod 700 "$SSH_DIR"
+  else
+    check_ssh_mount_permissions
+    
+    mkdir -p "$SSH_CLIENT_DIR"
+    chmod 700 "$SSH_CLIENT_DIR"
   fi
 }
 
