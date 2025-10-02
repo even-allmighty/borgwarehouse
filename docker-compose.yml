@@ -13,7 +13,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ${CONFIG_PATH:?CONFIG_PATH variable missing}:/home/borgwarehouse/app/config
+      - ${CONFIG_PATH:?CONFIG_PATH variable missing}:/app/config
       - ${SSH_PATH:?SSH_PATH variable missing}:/home/borgwarehouse/.ssh
       - ${SSH_HOST:?SSH_HOST variable missing}:/etc/ssh
       - ${BORG_REPOSITORY_PATH:?BORG_REPOSITORY_PATH variable missing}:/home/borgwarehouse/repos
