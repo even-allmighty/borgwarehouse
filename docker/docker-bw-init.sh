@@ -2,10 +2,6 @@
 
 set -e
 
-# Fixed paths for mounted volumes
-REPOS_MOUNT_DIR="$DATA_DIR/repos"
-REPOS_DIR="$REPOS_MOUNT_DIR/repos"
-
 print_green() {
   echo -e "\e[92m$1\e[0m"
 }
