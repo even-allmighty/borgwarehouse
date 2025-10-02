@@ -19,16 +19,14 @@ set -e
 # Ignore "lost+found" directories
 GLOBIGNORE="LOST+FOUND:lost+found"
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Use centralized configuration
+repos_path="$BW_REPOS_DIR"
 
 # Get the size of each repository and format as JSON
-cd "${home}"/repos
+cd "$repos_path"
 output=$(du -s -L -- * 2>/dev/null | awk '{print "{\"size\":" $1 ",\"name\":\"" $2 "\"}"}' | jq -s '.')
 if [ -z "$output" ]; then
   output="[]"

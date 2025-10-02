@@ -9,17 +9,12 @@
 # Exit when any command fails
 set -e
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
-
-# Some variables
-pool="${home}/repos"
-authorized_keys="${home}/.ssh/authorized_keys"
+# Use centralized configuration
+pool="$BW_REPOS_DIR"
+authorized_keys="$BW_AUTHORIZED_KEYS"
 
 # Check arg
 if [[ $# -ne 1 || $1 = "" ]]; then

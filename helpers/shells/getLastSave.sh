@@ -20,17 +20,15 @@
 # Exit when any command fails
 set -e
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Use centralized configuration
+repos_path="$BW_REPOS_DIR"
 
-if [ -n "$(find -L "${home}"/repos -mindepth 1 -maxdepth 1 -type d)" ]; then
+if [ -n "$(find -L "$repos_path" -mindepth 1 -maxdepth 1 -type d)" ]; then
   stat --format='{"repositoryName":"%n","lastSave":%Y}' \
-  "${home}"/repos/*/integrity* | 
+  "$repos_path"/*/integrity* | 
   jq --slurp '[.[] | .repositoryName = (.repositoryName | split("/")[-2])]'
 else
     echo "[]"
