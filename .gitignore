@@ -115,3 +115,5 @@ docker-compose.yml
 
 # Commit tests docker-compose
 !tests/bats/docker-compose.yml
+
+data
