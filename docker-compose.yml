@@ -12,7 +12,7 @@ services:
       - /tmp
     ports:
       - '${WEB_SERVER_PORT:?WEB_SERVER_PORT variable missing}:3000'
-      - '${SSH_SERVER_PORT:?SSH_SERVER_PORT variable missing}:22'
+      - '${SSH_SERVER_PORT:?SSH_SERVER_PORT variable missing}:2222'
     env_file:
       - .env
     volumes:
