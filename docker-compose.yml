@@ -15,7 +15,7 @@ services:
     volumes:
       - ${CONFIG_PATH:?CONFIG_PATH variable missing}:/app/config
       - ${SSH_PATH:?SSH_PATH variable missing}:/data/ssh
-      - ${BORG_REPOSITORY_PATH:?BORG_REPOSITORY_PATH variable missing}:/home/borgwarehouse/repos
+      - ${BORG_REPOSITORY_PATH:?BORG_REPOSITORY_PATH variable missing}:/data/repos
       - ${TMP_PATH:?TMP_PATH variable missing}:/home/borgwarehouse/tmp
       - ${LOGS_PATH:?LOGS_PATH variable missing}:/home/borgwarehouse/logs
   # Apprise is used to send notifications, it's optional. http://apprise:8000 is the URL to use in BorgWarehouse.

@@ -5,7 +5,7 @@ set -e
 # Fixed paths for mounted volumes
 SSH_DIR="/data/ssh"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
-REPOS_DIR="/home/borgwarehouse/repos"
+REPOS_DIR="/data/repos"
 
 print_green() {
   echo -e "\e[92m$1\e[0m";
