@@ -2,7 +2,8 @@
 
 set -e
 
-SSH_DIR="/home/borgwarehouse/.ssh"
+# Fixed paths for mounted volumes
+SSH_DIR="/data/ssh"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
 REPOS_DIR="/home/borgwarehouse/repos"
 
@@ -14,23 +15,68 @@ print_red() {
 }
 
 init_ssh_server() {
-  if [ -z "$(ls -A /etc/ssh)" ]; then
-    print_green "/etc/ssh is empty, generating SSH host keys..."
-    ssh-keygen -A
-    cp /home/borgwarehouse/moduli /etc/ssh/
+
+  mkdir -p "$SSH_HOST_KEYS_DIR"
+  chmod 700 "$SSH_HOST_KEYS_DIR"
+
+  if [ ! -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" ]; then
+    print_green "Generating SSH host keys..."
+    ssh-keygen -t rsa -b 4096 -f /data/ssh_host_keys/ssh_host_rsa_key -N ""
+    ssh-keygen -t ecdsa -f /data/ssh_host_keys/ssh_host_ecdsa_key -N ""
+    ssh-keygen -t ed25519 -f /data/ssh_host_keys/ssh_host_ed25519_key -N ""
   fi
-  if [ ! -f "/etc/ssh/sshd_config" ]; then
-    print_green "sshd_config not found in your volume, copying the default one..."
-    cp /home/borgwarehouse/app/sshd_config /etc/ssh/
+
+  # Set proper permissions for host keys
+  chmod 600 "$SSH_HOST_KEYS_DIR"/ssh_host_*_key
+  chmod 644 "$SSH_HOST_KEYS_DIR"/ssh_host_*_key.pub
+
+  # Write dynamic config that gets included by sshd_config
+  cat >/tmp/ssh_dynamic.conf <<-EOF
+	# Hostkeys
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_rsa_key
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_ed25519_key
+
+	Match User borgwarehouse
+	  AuthorizedKeysFile $AUTHORIZED_KEYS_FILE
+EOF
+}
+
+check_ssh_mount_permissions() {
+  # Check if SSH mount directory has correct permissions (700)
+  local current_perms=$(stat -c "%a" "$SSH_MOUNT_DIR" 2>/dev/null || echo "000")
+  
+  print_green "Checking SSH mount directory permissions: $SSH_MOUNT_DIR (current: $current_perms)"
+  
+  if [ "$current_perms" != "700" ]; then
+    print_red "SSH mount directory has incorrect permissions: $current_perms (expected: 700)"
+    print_green "Attempting to fix permissions..."
+    
+    if chmod 700 "$SSH_MOUNT_DIR" 2>/dev/null; then
+      print_green "Successfully set permissions to 700 on $SSH_MOUNT_DIR"
+    else
+      print_red "ERROR: Cannot set permissions on SSH mount directory!"
+      print_red "Please run the following command on the host system:"
+      print_red "  sudo chmod 700 $SSH_MOUNT_DIR"
+      print_red "  sudo chown \$(id -u):\$(id -g) $SSH_MOUNT_DIR"
+      print_red ""
+      print_red "The SSH mount directory must have 700 permissions and be owned by the user running the container."
+      exit 1
+    fi
+  else
+    print_green "SSH mount directory permissions are correct (700)"
   fi
 }
 
 check_ssh_directory() {
-  if [ ! -d "$SSH_DIR" ]; then
-    print_red "The .ssh directory does not exist, you need to mount it as docker volume."
+  if [ ! -d "$SSH_MOUNT_DIR" ]; then
+    print_red "The $SSH_MOUNT_DIR directory does not exist, you need to mount it as docker volume."
     exit 1
-  else 
-    chmod 700 "$SSH_DIR"
+  else
+    check_ssh_mount_permissions
+    
+    mkdir -p "$SSH_CLIENT_DIR"
+    chmod 700 "$SSH_CLIENT_DIR"
   fi
 }
 
@@ -53,9 +99,9 @@ check_repos_directory() {
 
 get_SSH_fingerprints() {
   print_green "Getting SSH fingerprints..."
-  RSA_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_rsa_key | awk '{print $2}')
-  ED25519_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key | awk '{print $2}')
-  ECDSA_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key | awk '{print $2}')
+  RSA_FINGERPRINT=$(ssh-keygen -lf /data/ssh/ssh_host_rsa_key | awk '{print $2}')
+  ED25519_FINGERPRINT=$(ssh-keygen -lf data/ssh/ssh_host_ed25519_key | awk '{print $2}')
+  ECDSA_FINGERPRINT=$(ssh-keygen -lf /data/ssh/ssh_host_ecdsa_key | awk '{print $2}')
   export SSH_SERVER_FINGERPRINT_RSA="$RSA_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ED25519="$ED25519_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ECDSA="$ECDSA_FINGERPRINT"
