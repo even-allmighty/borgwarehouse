@@ -19,19 +19,14 @@ set -e
 # Ignore "lost+found" directories
 GLOBIGNORE="LOST+FOUND:lost+found"
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
-
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
 # Get the size of each repository and format as JSON.
 # Each repository is measured independently with a per-repository timeout so that
 # an unreachable external storage (e.g. a dead SSHFS mount) cannot hang the whole
 # job: the faulty repository is simply skipped and the others are still reported.
-cd "${home}"/repos
+cd "$BW_REPOS_DIR"
 shopt -s nullglob
 output=$(
   for repo in *; do

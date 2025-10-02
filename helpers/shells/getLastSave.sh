@@ -20,13 +20,8 @@
 # Exit when any command fails
 set -e
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
-
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
 # Get the timestamp of the last backup (most recent "integrity.*" file mtime) for
 # each repository. Each repository is inspected independently with a per-repository
@@ -34,7 +29,7 @@ fi
 # hang the whole job: the faulty repository is simply skipped.
 shopt -s nullglob
 output=$(
-  for repo in "${home}"/repos/*; do
+  for repo in "$BW_REPOS_DIR"/*; do
     name=$(basename "$repo")
     # Expand the integrity* glob and stat it inside the timeout'd subprocess so
     # that an unreachable external storage (dead mount) cannot hang the shell.

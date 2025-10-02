@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+# BorgWarehouse Configuration
+# This file provides centralized path configuration for all BorgWarehouse shell scripts
+# Priority order: Docker variables > .env home variable > default values
+
+# Load .env if exists
+if [[ -f .env ]]; then
+    source .env
+fi
+
+# Set default fallback first
+: "${home:=/home/borgwarehouse}"
+
+# Configure repos directory
+if [[ -n "$REPOS_DIR" ]]; then
+    BW_REPOS_DIR="$REPOS_DIR"
+else
+    BW_REPOS_DIR="${home}/repos"
+fi
+
+# Configure authorized_keys file
+if [[ -n "$AUTHORIZED_KEYS_FILE" ]]; then
+    BW_AUTHORIZED_KEYS="$AUTHORIZED_KEYS_FILE"
+else
+    BW_AUTHORIZED_KEYS="${home}/.ssh/authorized_keys"
+fi
+
+# Configure data directory
+if [[ -n "$DATA_DIR" ]]; then
+    BW_DATA_DIR="$DATA_DIR"
+else
+    BW_DATA_DIR="$home"
+fi
+
+# Configure the borg base dir holding the cache, config and security files
+if [[ -n "$BORG_BASE_DIR" ]]; then
+    BW_BORG_BASE_DIR="$BORG_BASE_DIR"
+else
+    BW_BORG_BASE_DIR="$home"
+fi
+
+# Export variables so they're available to sourcing scripts
+export BW_REPOS_DIR
+export BW_AUTHORIZED_KEYS
+export BW_DATA_DIR
+export BW_BORG_BASE_DIR

@@ -9,13 +9,11 @@
 # Exit when any command fails
 set -e
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Use centralized configuration
+authorized_keys="$BW_AUTHORIZED_KEYS"
 
 # Check args
 if [ "$1" == "" ] || [ "$2" == "" ] || [ "$3" == "" ] || [ "$4" != "true" ] && [ "$4" != "false" ]; then
@@ -41,7 +39,7 @@ if ! [[ "$repositoryName" =~ ^[a-f0-9]{8}$ ]]; then
 fi
 
 # Check if a line in authorized_keys contains repository_name
-if ! grep -q "command=\".*${repositoryName}.*\",restrict" "$home/.ssh/authorized_keys"; then
+if ! grep -q "command=\".*${repositoryName}.*\",restrict" "$authorized_keys"; then
     echo -n "No line containing $repositoryName found in authorized_keys" >&2
     exit 4
 fi
@@ -64,7 +62,7 @@ while IFS= read -r line; do
             fi
         fi
     fi
-done < "$home/.ssh/authorized_keys"
+done < "$authorized_keys"
 if [ "$found" = true ]; then
     echo -n "This SSH pub key is already present in authorized_keys on a different line." >&2
     exit 5
@@ -72,10 +70,10 @@ fi
 
 # Append only mode
 if [ "$4" == "true" ]; then
-    sed -ri "/command=\".*${repositoryName}.*\",restrict/ {/borg serve .*--append-only /! s|(borg serve )|\1--append-only |}" "$home/.ssh/authorized_keys"
+    sed -ri "/command=\".*${repositoryName}.*\",restrict/ {/borg serve .*--append-only /! s|(borg serve )|\1--append-only |}" "$authorized_keys"
 elif [ "$4" == "false" ]; then
-    sed -ri "/command=\".*${repositoryName}.*\",restrict/ s|(--append-only )||g" "$home/.ssh/authorized_keys"
+    sed -ri "/command=\".*${repositoryName}.*\",restrict/ s|(--append-only )||g" "$authorized_keys"
 fi
 
 # Modify authorized_keys for the repositoryName: update the line with the quota and the SSH pub key
-sed -ri "s|(command=\".*${repositoryName}.*--storage-quota ).*G\",restrict .*|\\1$3G\",restrict $2|g" "$home/.ssh/authorized_keys"
+sed -ri "s|(command=\".*${repositoryName}.*--storage-quota ).*G\",restrict .*|\\1$3G\",restrict $2|g" "$authorized_keys"

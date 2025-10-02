@@ -12,16 +12,11 @@
 # Exit when any command fails
 set -e
 
-# Load .env if exists
-if [[ -f .env ]]; then
-    source .env
-fi
-
-# Default value if .env not exists
-: "${home:=/home/borgwarehouse}"
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
 
 # Some variables
-pool="${home}/repos"
+pool="$BW_REPOS_DIR"
 
 # Check arg
 if [[ $# -ne 1 || $1 = "" ]]; then
@@ -48,7 +43,7 @@ fi
 # Force borg to use the application user's home for its config/cache/security
 # directories. Without this, borg falls back to $HOME (e.g. /root in the
 # container) which is not writable by the app user -> "Permission denied: '/root/.cache'".
-export BORG_BASE_DIR="${home}"
+export BORG_BASE_DIR="$BW_BORG_BASE_DIR"
 # Disable interactive prompts so the command can never hang waiting for input.
 export BORG_RELOCATED_REPO_ACCESS_IS_OK=yes
 export BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=yes
