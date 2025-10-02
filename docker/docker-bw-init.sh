@@ -112,12 +112,41 @@ create_authorized_keys_file() {
   chmod 600 "$AUTHORIZED_KEYS_FILE"
 }
 
+check_repos_mount_permissions() {
+  # Get desired permissions from environment variable (default: 700)
+  local desired_perms="${REPOS_PERMISSIONS:-700}"
+  local current_perms=$(stat -c "%a" "$REPOS_DIR" 2>/dev/null || echo "000")
+  
+  print_green "Checking repos mount directory permissions: $REPOS_DIR (current: $current_perms, desired: $desired_perms)"
+  
+  if [ "$current_perms" != "$desired_perms" ]; then
+    print_red "Repos mount directory has incorrect permissions: $current_perms (expected: $desired_perms)"
+    print_green "Attempting to fix permissions..."
+    
+    if chmod "$desired_perms" "$REPOS_DIR" 2>/dev/null; then
+      print_green "Successfully set permissions to $desired_perms on $REPOS_DIR"
+    else
+      print_red "ERROR: Cannot set permissions on repos mount directory!"
+      print_red "Please run the following command on the host system:"
+      print_red "  sudo chmod $desired_perms $REPOS_DIR"
+      print_red "  sudo chown \$(id -u):\$(id -g) $REPOS_DIR"
+      print_red ""
+      print_red "The repos mount directory must have $desired_perms permissions and be owned by the user running the container."
+      print_red "You can customize the desired permissions by setting the REPOS_PERMISSIONS environment variable."
+      exit 2
+    fi
+  else
+    print_green "Repos mount directory permissions are correct ($desired_perms)"
+  fi
+}
+
 check_repos_directory() {
   if [ ! -d "$REPOS_DIR" ]; then
     print_red "The repos directory does not exist, you need to mount it as docker volume."
     exit 2
-  else 
-    chmod 700 "$REPOS_DIR"
+  else
+    # Check and fix mount directory permissions
+    check_repos_mount_permissions
   fi
 }
 

@@ -34,6 +34,8 @@ ENV SSH_CLIENT_DIR="$SSH_MOUNT_DIR/auth"
 ENV SSH_HOST_KEYS_DIR="$SSH_MOUNT_DIR/host_keys"
 ENV AUTHORIZED_KEYS_FILE="$SSH_MOUNT_DIR/authorized_keys"
 
+ENV REPOS_DIR="$DATA_DIR/repos"
+
 RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' >> /etc/apt/sources.list
 RUN apt-get update && apt-get install -y \
     supervisor curl jq jc borgbackup/bookworm-backports openssh-server libnss-wrapper && \
