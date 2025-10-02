@@ -29,7 +29,7 @@ ENV HOSTNAME=
 
 RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' >> /etc/apt/sources.list
 RUN apt-get update && apt-get install -y \
-    supervisor curl jq jc borgbackup/bookworm-backports openssh-server rsyslog && \
+    supervisor curl jq jc borgbackup/bookworm-backports openssh-server && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app
