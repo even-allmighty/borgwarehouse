@@ -5,9 +5,6 @@ services:
     #build:
     #   context: .
     #   dockerfile: Dockerfile
-    #   args:
-    #       - UID=${UID}
-    #       - GID=${GID}
     image: borgwarehouse/borgwarehouse
     user: '${UID:?UID variable missing}:${GID:?GID variable missing}'
     ports:
