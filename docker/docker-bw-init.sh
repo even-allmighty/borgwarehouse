@@ -85,7 +85,7 @@ create_authorized_keys_file() {
     print_green "The authorized_keys file does not exist, creating..."
     touch "$AUTHORIZED_KEYS_FILE"
   fi
-    chmod 600 "$AUTHORIZED_KEYS_FILE"
+  chmod 600 "$AUTHORIZED_KEYS_FILE"
 }
 
 check_repos_directory() {
