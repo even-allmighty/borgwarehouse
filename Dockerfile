@@ -18,7 +18,7 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 
-COPY . .
+COPY --exclude=docker --exclude=helpers/shells . .
 
 RUN sed -i "s/images:/output: 'standalone',images:/" next.config.ts
 
@@ -44,14 +44,15 @@ RUN cp /etc/ssh/moduli /home/borgwarehouse/
 
 WORKDIR /home/borgwarehouse/app
 
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/docker-bw-init.sh /app/LICENSE ./
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/helpers/shells ./helpers/shells
+COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/LICENSE ./
 COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/standalone ./
 COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/public ./public
 COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/static ./.next/static
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/supervisord.conf ./
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/rsyslog.conf /etc/rsyslog.conf
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/sshd_config ./
+
+COPY docker/supervisord.conf docker/docker-bw-init.sh ./
+COPY docker/rsyslog.conf /etc/rsyslog.conf
+COPY helpers/shells ./helpers/shells
+COPY docker/sshd_config ./
 
 USER borgwarehouse
 
