@@ -1,11 +1,10 @@
-Port 22
-PidFile /home/borgwarehouse/tmp/sshd.pid
+Include /tmp/ssh_dynamic.conf
+Port 2222
 AllowUsers borgwarehouse
 LogLevel INFO
 SyslogFacility AUTH
 
 # Security
-Protocol 2
 PermitRootLogin no
 PasswordAuthentication no
 ChallengeResponseAuthentication no

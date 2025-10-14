@@ -1,6 +1,3 @@
-ARG UID=1001
-ARG GID=1001
-
 FROM node:22-bookworm-slim as base
 
 # build stage
@@ -27,22 +24,20 @@ RUN npm run build
 # run stage
 FROM base AS runner
 
-ARG UID
-ARG GID
 
 ENV NODE_ENV production
 ENV HOSTNAME=
 
+ENV DATA_DIR="/data"
+
 RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' >> /etc/apt/sources.list
 RUN apt-get update && apt-get install -y \
-    supervisor curl jq jc borgbackup/bookworm-backports openssh-server && \
+    supervisor curl jq jc borgbackup/bookworm-backports openssh-server libnss-wrapper && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -g ${GID} borgwarehouse && useradd -m -u ${UID} -g ${GID} borgwarehouse
+RUN mkdir -p /app
 
-RUN cp /etc/ssh/moduli /home/borgwarehouse/
-
-WORKDIR /home/borgwarehouse/app
+WORKDIR /app
 
 COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/LICENSE ./
 COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/standalone ./
@@ -52,8 +47,6 @@ COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/static ./.nex
 COPY docker/supervisord.conf docker/docker-bw-init.sh ./
 COPY helpers/shells ./helpers/shells
 COPY docker/sshd_config /etc/ssh/sshd_config
-
-USER borgwarehouse
 
 EXPOSE 3000 22
 

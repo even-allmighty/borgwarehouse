@@ -2,26 +2,70 @@
 
 set -e
 
-SSH_DIR="/home/borgwarehouse/.ssh"
+SSH_DIR="$DATA_DIR/.ssh"
 AUTHORIZED_KEYS_FILE="$SSH_DIR/authorized_keys"
-REPOS_DIR="/home/borgwarehouse/repos"
+REPOS_DIR="$DATA_DIR/repos"
 
 print_green() {
-  echo -e "\e[92m$1\e[0m";
+  echo -e "\e[92m$1\e[0m"
 }
-print_red() { 
-  echo -e "\e[91m$1\e[0m";
+print_red() {
+  echo -e "\e[91m$1\e[0m"
+}
+
+setup_stub_passwd_for_ssh() {
+  # Create dummy passwd and group files for nss-wrapper
+  # This is needed because ssh-keygen requires passwd entries
+  local current_uid=$(id -u)
+  local current_gid=$(id -g)
+
+  print_green "Creating dummy passwd file for borgwarehouse (uid: $current_uid, gid: $current_gid)"
+
+  mkdir -p /tmp/borgwarehouse
+
+  # Create passwd file
+  echo "borgwarehouse:x:$current_uid:$current_gid:borgwarehouse gecos:/tmp/borgwarehouse:/bin/bash" >/tmp/passwd
+
+  # Create group file
+  echo "borgwarehouse:x:$current_gid:" >/tmp/group
+}
+
+# Function to run ssh-keygen with nss-wrapper
+ssh_keygen_with_nss() {
+  LD_PRELOAD="libnss_wrapper.so" NSS_WRAPPER_PASSWD="/tmp/passwd" NSS_WRAPPER_GROUP="/tmp/group" \
+    ssh-keygen "$@"
 }
 
 init_ssh_server() {
-  if [ -z "$(ls -A /etc/ssh)" ]; then
-    print_green "/etc/ssh is empty, generating SSH host keys..."
-    ssh-keygen -A
-    cp /home/borgwarehouse/moduli /etc/ssh/
+
+  mkdir -p "$SSH_HOST_KEYS_DIR"
+  chmod 700 "$SSH_HOST_KEYS_DIR"
+
+  if [ ! -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" ]; then
+    print_green "Generating SSH host keys..."
+
+    # Generate keys using nss-wrapper function
+    ssh_keygen_with_nss -t rsa -b 4096 -f "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" -N ""
+    ssh_keygen_with_nss -t ecdsa -f "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" -N ""
+    ssh_keygen_with_nss -t ed25519 -f "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" -N ""
+
   fi
-  if [ ! -f "/etc/ssh/sshd_config" ]; then
-    print_green "sshd_config not found in your volume, copying the default one..."
-    cp /home/borgwarehouse/app/sshd_config /etc/ssh/
+
+  # Set proper permissions for host keys
+  chmod 600 "$SSH_HOST_KEYS_DIR"/ssh_host_*_key
+  chmod 644 "$SSH_HOST_KEYS_DIR"/ssh_host_*_key.pub
+
+  # Write dynamic config that gets included by sshd_config
+  cat >/tmp/ssh_dynamic.conf <<-EOF
+	# Hostkeys
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_rsa_key
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key
+	HostKey $SSH_HOST_KEYS_DIR/ssh_host_ed25519_key
+
+	Match User borgwarehouse
+	  AuthorizedKeysFile $AUTHORIZED_KEYS_FILE
+EOF
+}
   fi
 }
 
@@ -39,7 +83,7 @@ create_authorized_keys_file() {
     print_green "The authorized_keys file does not exist, creating..."
     touch "$AUTHORIZED_KEYS_FILE"
   fi
-    chmod 600 "$AUTHORIZED_KEYS_FILE"
+  chmod 600 "$AUTHORIZED_KEYS_FILE"
 }
 
 check_repos_directory() {
@@ -51,11 +95,11 @@ check_repos_directory() {
   fi
 }
 
-get_SSH_fingerprints() {
+print_ssh_fingerprints() {
   print_green "Getting SSH fingerprints..."
-  RSA_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_rsa_key | awk '{print $2}')
-  ED25519_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key | awk '{print $2}')
-  ECDSA_FINGERPRINT=$(ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key | awk '{print $2}')
+  RSA_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_rsa_key" | awk '{print $2}')
+  ED25519_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_ed25519_key" | awk '{print $2}')
+  ECDSA_FINGERPRINT=$(ssh_keygen_with_nss -lf "$SSH_HOST_KEYS_DIR/ssh_host_ecdsa_key" | awk '{print $2}')
   export SSH_SERVER_FINGERPRINT_RSA="$RSA_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ED25519="$ED25519_FINGERPRINT"
   export SSH_SERVER_FINGERPRINT_ECDSA="$ECDSA_FINGERPRINT"
@@ -75,12 +119,13 @@ check_env() {
   fi
 }
 
+setup_stub_passwd_for_ssh
 check_env
 init_ssh_server
 check_ssh_directory
 create_authorized_keys_file
 check_repos_directory
-get_SSH_fingerprints
+print_ssh_fingerprints
 
 print_green "Successful initialization. BorgWarehouse is ready !"
-exec supervisord -c /home/borgwarehouse/app/supervisord.conf 
+exec supervisord -c /app/supervisord.conf
