@@ -45,10 +45,10 @@ RUN mkdir -p /app
 
 WORKDIR /app
 
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/LICENSE ./
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/standalone ./
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/public ./public
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/static ./.next/static
+COPY --from=builder /app/LICENSE ./
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/static ./.next/static
 
 COPY docker/supervisord.conf docker/docker-bw-init.sh ./
 COPY helpers/shells ./helpers/shells
