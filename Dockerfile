@@ -52,7 +52,7 @@ COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/static ./.nex
 COPY docker/supervisord.conf docker/docker-bw-init.sh ./
 COPY docker/rsyslog.conf /etc/rsyslog.conf
 COPY helpers/shells ./helpers/shells
-COPY docker/sshd_config ./
+COPY docker/sshd_config /etc/ssh/sshd_config
 
 USER borgwarehouse
 
