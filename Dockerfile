@@ -1,6 +1,3 @@
-ARG UID=1001
-ARG GID=1001
-
 FROM node:22-bookworm-slim as base
 
 # build stage
@@ -18,7 +15,7 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 
-COPY . .
+COPY --exclude=docker --exclude=helpers/shells . .
 
 RUN sed -i "s/images:/output: 'standalone',images:/" next.config.ts
 
@@ -27,33 +24,35 @@ RUN npm run build
 # run stage
 FROM base AS runner
 
-ARG UID
-ARG GID
 
 ENV NODE_ENV production
 ENV HOSTNAME=
 
+ENV DATA_DIR="/data"
+ENV SSH_MOUNT_DIR="$DATA_DIR/ssh"
+ENV SSH_CLIENT_DIR="$SSH_MOUNT_DIR/auth"
+ENV SSH_HOST_KEYS_DIR="$SSH_MOUNT_DIR/host_keys"
+ENV AUTHORIZED_KEYS_FILE="$SSH_MOUNT_DIR/authorized_keys"
+
+ENV REPOS_DIR="$DATA_DIR/repos"
+
 RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' >> /etc/apt/sources.list
 RUN apt-get update && apt-get install -y \
-    supervisor curl jq jc borgbackup/bookworm-backports openssh-server rsyslog && \
+    supervisor curl jq jc borgbackup/bookworm-backports openssh-server libnss-wrapper && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -g ${GID} borgwarehouse && useradd -m -u ${UID} -g ${GID} borgwarehouse
+RUN mkdir -p /app
 
-RUN cp /etc/ssh/moduli /home/borgwarehouse/
+WORKDIR /app
 
-WORKDIR /home/borgwarehouse/app
+COPY --from=builder /app/LICENSE ./
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/static ./.next/static
 
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/docker-bw-init.sh /app/LICENSE ./
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/helpers/shells ./helpers/shells
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/standalone ./
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/public ./public
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/.next/static ./.next/static
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/supervisord.conf ./
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/rsyslog.conf /etc/rsyslog.conf
-COPY --from=builder --chown=borgwarehouse:borgwarehouse /app/docker/sshd_config ./
-
-USER borgwarehouse
+COPY docker/supervisord.conf docker/docker-bw-init.sh ./
+COPY helpers/shells ./helpers/shells
+COPY docker/sshd_config /etc/ssh/sshd_config
 
 EXPOSE 3000 22
 

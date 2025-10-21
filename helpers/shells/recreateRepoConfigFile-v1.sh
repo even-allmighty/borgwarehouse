@@ -33,7 +33,12 @@
 # |  43G |   64G |
 ################################################################################
 
-bwDataDir="/var/borgwarehouse"
+# Load BorgWarehouse configuration
+source "$(dirname "$0")/bw-config"
+
+# Use centralized configuration
+bwDataDir="$BW_DATA_DIR"
+
 directoriesList=$(ls -A $bwDataDir)
 _AUTOSIZE=0
 
